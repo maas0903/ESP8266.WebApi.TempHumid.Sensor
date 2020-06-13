@@ -16,7 +16,7 @@
 #include <ESP8266WebServer.h>
 
 //#define DEBUG
-IPAddress staticIP(192, 168, 63, 133);
+IPAddress staticIP(192, 168, 63, 53);
 #define URI "/humid"
 IPAddress gateway(192, 168, 63, 1);
 IPAddress subnet(255, 255, 255, 0);
