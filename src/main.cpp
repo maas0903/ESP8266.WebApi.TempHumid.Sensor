@@ -16,7 +16,7 @@
 #include <ESP8266WebServer.h>
 
 //#define DEBUG
-IPAddress staticIP(192, 168, 63, 132);
+IPAddress staticIP(192, 168, 63, 133);
 #define URI "/humid"
 IPAddress gateway(192, 168, 63, 1);
 IPAddress subnet(255, 255, 255, 0);
@@ -39,7 +39,7 @@ WiFiUDP ntpUDP;
 const long utcOffsetInSeconds = 0;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
 
-int deviceCount = 1;
+int deviceCount = 3;
 
 ESP8266WebServer http_rest_server(HTTP_REST_PORT);
 
@@ -100,18 +100,22 @@ void get_temps()
     StaticJsonBuffer<600> jsonBuffer;
     JsonObject &jsonObj = jsonBuffer.createObject();
     char JSONmessageBuffer[600];
+    deviceCount = 3;
 
     try
     {
 #ifdef DEBUG
         jsonObj["DEBUG"] = "******* true *******";
-#endif
+#else
         jsonObj["DEBUG"] = "false";
+#endif
         jsonObj["UtcTime"] = GetCurrentTime();
-        jsonObj["DeviceCount"] = deviceCount;
         jsonObj["Hostname"] = hostName;
         jsonObj["IpAddress"] = WiFi.localIP().toString();
-        jsonObj["Mac Address"] = WiFi.macAddress();
+        jsonObj["MacAddress"] = WiFi.macAddress();
+        jsonObj["Gpio"] = 2;
+        jsonObj["DeviceType"] = "Humidity";
+        jsonObj["DeviceCount"] = deviceCount;
 
         float h;
         float t;
@@ -140,13 +144,22 @@ void get_temps()
         }
         else
         {
-            jsonObj["Gpio"] = 2;
-
             // Compute heat index in Celcius
             float hic = dht.computeHeatIndex(t, h, false);
-            jsonObj["Humidity"] = h;
-            jsonObj["Temperature"] = t;
-            jsonObj["Heat_Index"] = hic;
+ 
+            JsonArray &sensors = jsonObj.createNestedArray("Sensors");
+            JsonObject &sensor1 = sensors.createNestedObject();
+            sensor1["Id"] = "0";
+            sensor1["ValueType"] = "Humidity";
+            sensor1["Value"] = (String)h;
+            JsonObject &sensor2 = sensors.createNestedObject();
+            sensor2["Id"] = "0";
+            sensor2["ValueType"] = "Temperature";
+            sensor2["Value"] = (String)t;
+            JsonObject &sensor3 = sensors.createNestedObject();
+            sensor3["Id"] = "0";
+            sensor3["ValueType"] = "HeatIndex";
+            sensor3["Value"] = (String)hic;
         }
     }
     catch (const std::exception &e)
