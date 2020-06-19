@@ -9,8 +9,6 @@
 #include <SPI.h>
 
 #include <WiFiUdp.h>
-#include <NTPClient.h>
-#include <TimeLib.h>
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -22,7 +20,7 @@ IPAddress gateway(192, 168, 63, 1);
 IPAddress subnet(255, 255, 255, 0);
 IPAddress dns(192, 168, 63, 21);
 IPAddress dnsGoogle(8, 8, 8, 8);
-String hostName = "esp01";
+String hostName = "veranda";
 
 #define HTTP_REST_PORT 80
 #define WIFI_RETRY_DELAY 500
@@ -37,7 +35,6 @@ DHT dht(DHTPIN, DHTTYPE);
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
 const long utcOffsetInSeconds = 0;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
 
 int deviceCount = 3;
 
@@ -77,23 +74,6 @@ int init_wifi()
     return WiFi.status();
 }
 
-String GetCurrentTime()
-{
-    timeClient.update();
-    unsigned long epochTime = timeClient.getEpochTime();
-    char buff[32];
-
-    sprintf(buff, "%02d-%02d-%02d %02d:%02d:%02d",
-            year(epochTime),
-            month(epochTime),
-            day(epochTime),
-            hour(epochTime),
-            minute(epochTime),
-            second(epochTime));
-    String currentTime = buff;
-    return currentTime;
-}
-
 void get_temps()
 {
     BlinkNTimes(LED_0, 2, 500);
@@ -109,7 +89,6 @@ void get_temps()
 #else
         jsonObj["DEBUG"] = "false";
 #endif
-        jsonObj["UtcTime"] = GetCurrentTime();
         jsonObj["Hostname"] = hostName;
         jsonObj["IpAddress"] = WiFi.localIP().toString();
         jsonObj["MacAddress"] = WiFi.macAddress();
@@ -184,7 +163,7 @@ void config_rest_server_routing()
 {
     http_rest_server.on("/", HTTP_GET, []() {
         http_rest_server.send(200, "text/html",
-                              "Welcome to the ESP8266 REST Web Server: " + GetCurrentTime());
+                              "Welcome to the ESP8266 REST Web Server: " + hostName);
     });
     http_rest_server.on(URI, HTTP_GET, get_temps);
 }
@@ -208,8 +187,6 @@ void setup(void)
         Serial.print("Error connecting to: ");
         Serial.println(ssid);
     }
-
-    timeClient.begin();
 
     config_rest_server_routing();
 
