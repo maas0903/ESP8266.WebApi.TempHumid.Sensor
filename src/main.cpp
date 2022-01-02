@@ -18,8 +18,10 @@
 
 //#define DEBUG
 IPAddress staticIP(192, 168, 63, 65);
-String hostName = "kelder1";
+#define LED_0 0
+#define DHTPIN 2
 #define URI "/humid"
+String hostName = "kelder1";
 IPAddress gateway(192, 168, 63, 1);
 IPAddress subnet(255, 255, 255, 0);
 IPAddress dns(192, 168, 63, 21);
@@ -29,9 +31,7 @@ IPAddress dnsGoogle(8, 8, 8, 8);
 #define WIFI_RETRY_DELAY 500
 #define MAX_WIFI_INIT_RETRY 50
 
-#define LED_0 0
-#define DHTPIN 2
-#define DHTTYPE DHT22 // DHT 22 (AM2302), AM2321
+#define DHTTYPE DHT22 //DHT11 (AM2302), AM2321
 
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -81,27 +81,44 @@ void get_temps()
         t = 22;
 #else
         int numberOfTries = 0;
+        int numberRead = 0;
+        int numberNotRead = 0;
+        float temperature = 0;
+        float humidity = 0;
         do
         {
-            th[0] = dht.readTemperature();
+            temperature = dht.readTemperature();
             delay(250);
-            th[1] = dht.readHumidity();
+            humidity = dht.readHumidity();
             delay(250);
             numberOfTries++;
+
+            if (isnan(temperature) || isnan(humidity))
+            {
+                numberNotRead++;
+            }
+            else
+            {
+                numberRead++;
+                th[0] = th[0] + temperature;
+                th[1] = th[1] + humidity;
+            }
+
             Serial.print("Number of tries = ");
             Serial.println(numberOfTries);
-            if (numberOfTries > 1)
+            if (numberNotRead > 1)
             {
                 dht.begin();
                 delay(500);
+                numberNotRead = 0;
             }
 
-        } while ((isnan(th[0]) || isnan(th[1])) && numberOfTries < 10);
+        } while (numberOfTries < 20);
 
 #endif
 
         // Check if any reads failed and exit early (to try again).
-        if (numberOfTries == 10)
+        if (numberRead == 0)
         {
             Serial.println("Failed to read from DHT sensor!");
             deviceCount = 0;
@@ -115,7 +132,10 @@ void get_temps()
         }
         else
         {
+            th[0] = th[0] / numberRead;
+            th[1] = th[1] / numberRead;
             jsonObj["numberOfTries"] = numberOfTries;
+            jsonObj["numberOfRead"] = numberRead;
             // Compute heat index in Celcius
             float hic = dht.computeHeatIndex(th[0], th[1], false);
 
