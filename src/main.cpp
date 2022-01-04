@@ -2,8 +2,6 @@
 #include <ArduinoJson.h>
 #include <Arduino.h>
 
-#include <credentials.h>
-
 #include <Wire.h>
 #include <SPI.h>
 
@@ -16,24 +14,28 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 
+#include <credentials.h>
+#include <OTA.h>
+
+#include <SSD1306Wire.h>
+
+SSD1306Wire display(0x3c, D2, D1); // D2=SDK  D1=SCK  As per labeling on NodeMCU
+
 //#define DEBUG
-IPAddress staticIP(192, 168, 63, 65);
 #define LED_0 0
 #define DHTPIN 2
 #define URI "/humid"
-String hostName = "kelder1";
-IPAddress gateway(192, 168, 63, 1);
-IPAddress subnet(255, 255, 255, 0);
-IPAddress dns(192, 168, 63, 21);
-IPAddress dnsGoogle(8, 8, 8, 8);
 
 #define HTTP_REST_PORT 80
 #define WIFI_RETRY_DELAY 500
 #define MAX_WIFI_INIT_RETRY 50
 
-#define DHTTYPE DHT22 //DHT11 (AM2302), AM2321
+#define DHTTYPE DHT11 // DHT22 (AM2302), AM2321
 
 DHT dht(DHTPIN, DHTTYPE);
+
+unsigned long time_now = 0;
+int period = 1 * 60 * 1000; // 120000;
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
@@ -55,8 +57,39 @@ void BlinkNTimes(int pin, int blinks, unsigned long millies)
     }
 }
 
+void displaySetup()
+{
+    display.init();
+
+    display.flipScreenVertically();
+    display.setFont(ArialMT_Plain_10);
+}
+
+float th[2];
+
+void displayStatus(String status, boolean isStatus = false)
+{
+    display.clear();
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+    display.setFont(ArialMT_Plain_10);
+    display.drawString(0, 0, status);
+    if (!isStatus)
+    {
+        display.setTextAlignment(TEXT_ALIGN_LEFT);
+        display.setFont(ArialMT_Plain_16);
+        display.drawString(0, 14, "Lug T: " + String(th[0]) + " °C");
+        display.drawString(0, 30, "Lugvog: " + String(th[1]) + " %");
+        display.drawString(0, 46, "*******************");
+    }
+    display.display();
+}
+
+boolean reading = false;
+
 void get_temps()
 {
+    reading = true;
+    displayStatus("Spaarkamer - Lees ....", true);
     BlinkNTimes(LED_0, 2, 500);
     StaticJsonDocument<1024> jsonObj;
     deviceCount = 3;
@@ -75,7 +108,7 @@ void get_temps()
         jsonObj["DeviceType"] = "Humidity";
         jsonObj["DeviceCount"] = deviceCount;
 
-        float th[2];
+        // float th[2];
 #ifdef DEBUG
         h = 55;
         t = 22;
@@ -106,6 +139,8 @@ void get_temps()
 
             Serial.print("Number of tries = ");
             Serial.println(numberOfTries);
+            displayStatus("Spaarkamer - Lees .... " + String(numberRead), true);
+
             if (numberNotRead > 1)
             {
                 dht.begin();
@@ -171,6 +206,9 @@ void get_temps()
     http_rest_server.send(200, "application/json", jSONmessageBuffer);
 
     Serial.println(jSONmessageBuffer);
+
+    displayStatus("Spaarkamer");
+    reading = false;
 }
 
 void config_rest_server_routing()
@@ -186,17 +224,21 @@ void init_wifi()
     int retries = 0;
 
     Serial.println("Connecting to WiFi");
+    displayStatus("Spaarkamer", true);
 
-    WiFi.config(staticIP, gateway, subnet, dns, dnsGoogle);
+    WiFi.config(staticIP, gateway, subnet, dnsGoogle);
     WiFi.mode(WIFI_STA);
     WiFi.hostname(hostName);
     WiFi.begin(ssid, password);
 
+    String sRetries = "#";
     while ((WiFi.status() != WL_CONNECTED) && (retries < MAX_WIFI_INIT_RETRY))
     {
         retries++;
         delay(WIFI_RETRY_DELAY);
-        Serial.print("#");
+        Serial.print(sRetries);
+        displayStatus("Spaarkamer " + sRetries, true);
+        sRetries += "#";
     }
     Serial.println();
 
@@ -217,6 +259,8 @@ void init_wifi()
 
 void resetInit()
 {
+    displaySetup();
+
     pinMode(DHTPIN, INPUT);
     delay(200);
     dht.begin();
@@ -225,11 +269,18 @@ void resetInit()
     init_wifi();
     delay(200);
 
+    setupOTA("Spaarkamer", ssid, password);
+
     config_rest_server_routing();
     delay(200);
     http_rest_server.begin();
 
     Serial.println("HTTP REST Server Started");
+    displayStatus("HTTP REST Server Started", true);
+
+    delay(1000);
+
+    get_temps();
 }
 
 void setup(void)
@@ -240,5 +291,19 @@ void setup(void)
 
 void loop(void)
 {
+    if (!reading)
+         ArduinoOTA.handle();
+
+    delay(200);
+
+    if (millis() > time_now + period)
+    {
+        if (!reading)
+        {
+            get_temps();
+        }
+        time_now = millis();
+    }
+
     http_rest_server.handleClient();
 }
