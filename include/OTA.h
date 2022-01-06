@@ -42,12 +42,12 @@ void setupOTA(const char *nameprefix, const char *ssid, const char *password)
   //WiFi.begin(ssid, password);
 
   // Wait for connection
-  while (WiFi.waitForConnectResult() != WL_CONNECTED)
+  /*while (WiFi.waitForConnectResult() != WL_CONNECTED)
   {
     Serial.println("Connection Failed! Rebooting...");
     delay(5000);
     ESP.restart();
-  }
+  }*/
 
   // Port defaults to 3232
   // ArduinoOTA.setPort(3232); // Use 8266 port if you are working in Sloeber IDE, it is fixed there and not adjustable

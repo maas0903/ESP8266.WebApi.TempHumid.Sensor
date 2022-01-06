@@ -219,7 +219,7 @@ void config_rest_server_routing()
     http_rest_server.on(URI, HTTP_GET, get_temps);
 }
 
-void init_wifi()
+boolean init_wifi()
 {
     int retries = 0;
 
@@ -231,14 +231,11 @@ void init_wifi()
     WiFi.hostname(hostName);
     WiFi.begin(ssid, password);
 
-    String sRetries = "#";
     while ((WiFi.status() != WL_CONNECTED) && (retries < MAX_WIFI_INIT_RETRY))
     {
         retries++;
         delay(WIFI_RETRY_DELAY);
-        Serial.print(sRetries);
-        displayStatus("Spaarkamer " + sRetries, true);
-        sRetries += "#";
+        displayStatus("Spaarkamer " + String(retries), true);
     }
     Serial.println();
 
@@ -249,11 +246,14 @@ void init_wifi()
         Serial.print("--- IP: ");
         Serial.println(WiFi.localIP());
         BlinkNTimes(LED_0, 3, 500);
+        return true;
     }
     else
     {
+        displayStatus("Spaarkamer NO WIFI", true);
         Serial.print("Error connecting to: ");
         Serial.println(ssid);
+        return false;
     }
 }
 
@@ -266,7 +266,12 @@ void resetInit()
     dht.begin();
     delay(200);
 
-    init_wifi();
+    if (!init_wifi())
+    {
+        displayStatus("No WIFI 2", true);
+        ESP.restart;
+    }
+
     delay(200);
 
     setupOTA("Spaarkamer", ssid, password);
@@ -291,8 +296,8 @@ void setup(void)
 
 void loop(void)
 {
-    if (!reading)
-         ArduinoOTA.handle();
+    // if (!reading)
+    ArduinoOTA.handle();
 
     delay(200);
 
