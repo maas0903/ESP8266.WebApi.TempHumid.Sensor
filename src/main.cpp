@@ -8,10 +8,7 @@
 #include <ESP8266WiFi.h>
 #include <credentials.h>
 #include <OTA.h>
-#include <SSD1306Wire.h>
 #include <InfluxDbClient.h>
-
-SSD1306Wire display(0x3c, D2, D1); // D2=SDK  D1=SCK  As per labeling on NodeMCU
 
 //#define DEBUG
 #define LED_0 0
@@ -19,7 +16,7 @@ SSD1306Wire display(0x3c, D2, D1); // D2=SDK  D1=SCK  As per labeling on NodeMCU
 #define URI "/humid"
 #define WIFI_RETRY_DELAY 500
 #define MAX_WIFI_INIT_RETRY 50
-#define DHTTYPE DHT11 // DHT22 (AM2302), AM2321
+#define DHTTYPE DHT22 // DHT11 (AM2302), AM2321
 
 #define INFLUXDB_URL "http://192.168.63.28:8086"
 #define INFLUXDB_TOKEN "tokedid"
@@ -27,7 +24,7 @@ SSD1306Wire display(0x3c, D2, D1); // D2=SDK  D1=SCK  As per labeling on NodeMCU
 #define INFLUXDB_BUCKET "sensors"
 
 InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
-Point sensor("room_sensor");
+Point sensor("tent");
 unsigned long previousMillisWiFi = 0;
 
 DHT dht(DHTPIN, DHTTYPE);
@@ -49,39 +46,13 @@ void BlinkNTimes(int pin, int blinks, unsigned long millies)
     }
 }
 
-void displaySetup()
-{
-    display.init();
-
-    display.flipScreenVertically();
-    display.setFont(ArialMT_Plain_10);
-}
-
 float th[2];
-
-void displayStatus(String status, boolean isStatus = false)
-{
-    display.clear();
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    display.setFont(ArialMT_Plain_10);
-    display.drawString(0, 0, status);
-    if (!isStatus)
-    {
-        display.setTextAlignment(TEXT_ALIGN_LEFT);
-        display.setFont(ArialMT_Plain_16);
-        display.drawString(0, 14, "Lug T: " + String(th[0]) + " °C");
-        display.drawString(0, 30, "Lugvog: " + String(th[1]) + " %");
-        display.drawString(0, 46, "*******************");
-    }
-    display.display();
-}
 
 boolean reading = false;
 
 void get_temps()
 {
     reading = true;
-    displayStatus("Spaarkamer - Lees ....", true);
     BlinkNTimes(LED_0, 2, 500);
     deviceCount = 3;
 
@@ -117,7 +88,6 @@ void get_temps()
 
             Serial.print("Number of tries = ");
             Serial.println(numberOfTries);
-            displayStatus("Spaarkamer - Lees .... " + String(numberRead), true);
 
             if (numberNotRead > 1)
             {
@@ -168,7 +138,6 @@ void get_temps()
     {
     }
 
-    displayStatus("Spaarkamer");
     reading = false;
 }
 
@@ -177,7 +146,6 @@ boolean init_wifi()
     int retries = 0;
 
     Serial.println("Connecting to WiFi");
-    displayStatus("Spaarkamer", true);
 
     WiFi.config(staticIP, gateway, subnet, dnsGoogle);
     WiFi.mode(WIFI_STA);
@@ -188,7 +156,6 @@ boolean init_wifi()
     {
         retries++;
         delay(WIFI_RETRY_DELAY);
-        displayStatus("Spaarkamer " + String(retries), true);
     }
     Serial.println();
 
@@ -203,7 +170,6 @@ boolean init_wifi()
     }
     else
     {
-        displayStatus("Spaarkamer NO WIFI", true);
         Serial.print("Error connecting to: ");
         Serial.println(ssid);
         return false;
@@ -212,8 +178,6 @@ boolean init_wifi()
 
 void resetInit()
 {
-    displaySetup();
-
     pinMode(DHTPIN, INPUT);
     delay(200);
     dht.begin();
@@ -221,7 +185,6 @@ void resetInit()
 
     if (!init_wifi())
     {
-        displayStatus("No WIFI 2", true);
         ESP.restart;
     }
 
@@ -230,7 +193,6 @@ void resetInit()
     setupOTA("Spaarkamer", ssid, password);
 
     Serial.println("HTTP REST Server Started");
-    displayStatus("HTTP REST Server Started", true);
 
     delay(1000);
 
