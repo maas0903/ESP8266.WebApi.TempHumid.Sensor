@@ -202,6 +202,7 @@ void get_temps()
 
     http_rest_server.sendHeader("Access-Control-Allow-Origin", "*");
     http_rest_server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    http_rest_server.sendHeader("Refresh", "30"); 
 
     http_rest_server.send(200, "application/json", jSONmessageBuffer);
 
@@ -301,7 +302,7 @@ void loop(void)
 
     delay(200);
 
-    if (millis() > time_now + period)
+    /*if (millis() > time_now + period)
     {
         if (!reading)
         {
@@ -309,6 +310,7 @@ void loop(void)
         }
         time_now = millis();
     }
+    */
 
     http_rest_server.handleClient();
 }
