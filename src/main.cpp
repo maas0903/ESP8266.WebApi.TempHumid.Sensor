@@ -17,12 +17,10 @@
 #define DHTTYPE DHT22 // DHT11
 
 #define INFLUXDB_URL "http://192.168.63.28:8086"
-#define INFLUXDB_TOKEN "tokedid"
-#define INFLUXDB_ORG "org"
-#define INFLUXDB_BUCKET "sensors"
+#define INFLUXDB_ORG "huis"
+#define INFLUXDB_BUCKET "huis"
 
-InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
-Point sensor("humid-test2");
+InfluxDBClient influxDbClient(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 unsigned long previousMillisWiFi = 0;
 
 DHT dht(DHTPIN, DHTTYPE);
@@ -99,15 +97,15 @@ void resetInit()
 
     delay(200);
 
-    if (client.validateConnection())
+    if (influxDbClient.validateConnection())
     {
         Serial.print("Connected to InfluxDB: ");
-        Serial.println(client.getServerUrl());
+        Serial.println(influxDbClient.getServerUrl());
     }
     else
     {
         Serial.print("InfluxDB connection failed: ");
-        Serial.println(client.getLastErrorMessage());
+        Serial.println(influxDbClient.getLastErrorMessage());
     }
 }
 
@@ -179,29 +177,43 @@ void get_temps()
 
             float hic = dht.computeHeatIndex(th[0], th[1], false);
 
-            sensor.clearFields();
+            Point influxDbSensor("DHT22-" + hostName);
+            influxDbSensor.clearFields();
+            influxDbSensor.addField("ipaddress", WiFi.localIP().toString());
+            influxDbSensor.addField("mac-address", WiFi.macAddress());
+            influxDbSensor.addField("temperature", th[0]);
+            Serial.println(influxDbClient.pointToLineProtocol(influxDbSensor));
 
-            sensor.addField("temperature", th[0]);
-            sensor.addField("humidity", th[1]);
-            sensor.addField("heat-index", hic);
-            sensor.addField("resets", resets);
-            sensor.addField("ipaddress", WiFi.localIP().toString());
-            sensor.addField("mac-address", WiFi.macAddress());
-            Serial.print("writing: ");
-            Serial.println(client.pointToLineProtocol(sensor));
-
-            while (!client.canSendRequest())
-            {
-                Serial.println("client not ready");
-            }
-
-            if (!client.writePoint(sensor))
+            if (!influxDbClient.writePoint(influxDbSensor))
             {
                 Serial.print("InfluxDB write failed: ");
-                Serial.println(client.getLastErrorMessage());
+                Serial.println(influxDbClient.getLastErrorMessage());
+            }
+
+            influxDbSensor.clearFields();
+            influxDbSensor.addField("ipaddress", WiFi.localIP().toString());
+            influxDbSensor.addField("mac-address", WiFi.macAddress());
+            influxDbSensor.addField("humidity", th[1]);
+            Serial.println(influxDbClient.pointToLineProtocol(influxDbSensor));
+
+            if (!influxDbClient.writePoint(influxDbSensor))
+            {
+                Serial.print("InfluxDB write failed: ");
+                Serial.println(influxDbClient.getLastErrorMessage());
+            }
+
+            influxDbSensor.clearFields();
+            influxDbSensor.addField("ipaddress", WiFi.localIP().toString());
+            influxDbSensor.addField("mac-address", WiFi.macAddress());
+            influxDbSensor.addField("heat-index", hic);
+            Serial.println(influxDbClient.pointToLineProtocol(influxDbSensor));
+
+            if (!influxDbClient.writePoint(influxDbSensor))
+            {
+                Serial.print("InfluxDB write failed: ");
+                Serial.println(influxDbClient.getLastErrorMessage());
                 resetInit();
             }
-            Serial.println("done");
         }
     }
     catch (const std::exception &e)
